@@ -1,24 +1,36 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/Corogura/gator/internal/config"
+	"github.com/Corogura/gator/internal/database"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+	db, err := sql.Open("postgres", cfg.Db_url)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	st := state{
+		db:  database.New(db),
 		cfg: &cfg,
 	}
 	cmds := commands{
 		cmds: make(map[string]func(*state, command) error),
 	}
 	cmds.register("login", handlerLogin)
+	cmds.register("register", handlerRegister)
 	args := os.Args
 	if len(args) < 2 {
 		fmt.Println("enter command")
@@ -33,5 +45,4 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println(len(cmd.arg))
 }

@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Corogura/gator/internal/config"
+	"github.com/Corogura/gator/internal/database"
+	"github.com/google/uuid"
 )
 
 type state struct {
+	db  *database.Queries
 	cfg *config.Config
 }
 
@@ -20,11 +25,37 @@ func handlerLogin(s *state, cmd command) error {
 	if len(cmd.arg) == 0 {
 		return errors.New("enter username")
 	}
-	err := s.cfg.SetUser(cmd.arg[0])
+	_, err := s.db.GetUser(context.Background(), cmd.arg[0])
+	if err != nil {
+		return errors.New("user does not exist")
+	}
+	err = s.cfg.SetUser(cmd.arg[0])
 	if err != nil {
 		return err
 	}
-	fmt.Println("user set successfully")
+	fmt.Println("user logged in successfully")
+	return nil
+}
+
+func handlerRegister(s *state, cmd command) error {
+	if len(cmd.arg) < 1 {
+		return errors.New("enter username")
+	}
+	user, err := s.db.CreateUser(
+		context.Background(),
+		database.CreateUserParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Name:      cmd.arg[0],
+		},
+	)
+	if err != nil {
+		return err
+	}
+	s.cfg.SetUser(cmd.arg[0])
+	fmt.Println("user registered successfully")
+	fmt.Printf("user id: %s, created_at: %v, updated_at: %v, name: %s\n", user.ID, user.CreatedAt, user.UpdatedAt, user.Name)
 	return nil
 }
 
