@@ -59,6 +59,30 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
+func handlerReset(s *state, _ command) error {
+	err := s.db.ResetUser(context.Background())
+	if err != nil {
+		return err
+	}
+	fmt.Println("user reset successfully")
+	return nil
+}
+
+func handlerUsers(s *state, _ command) error {
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		if user.Name == s.cfg.Current_user_name {
+			fmt.Printf("* %s (current)\n", user.Name)
+		} else {
+			fmt.Printf("* %s\n", user.Name)
+		}
+	}
+	return nil
+}
+
 type commands struct {
 	cmds map[string]func(*state, command) error
 }
