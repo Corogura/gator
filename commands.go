@@ -83,6 +83,67 @@ func handlerUsers(s *state, _ command) error {
 	return nil
 }
 
+func handlerAgg(s *state, _ command) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	feed, err := fetchFeed(ctx, "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return fmt.Errorf("failed to fetch feed: %w", err)
+	}
+	fmt.Printf("Title: %s\n", feed.Channel.Title)
+	fmt.Printf("Link: %s\n", feed.Channel.Link)
+	fmt.Printf("Description: %s\n", feed.Channel.Description)
+	for i, item := range feed.Channel.Item {
+		fmt.Printf("Item[%d] Title: %s\n", i, item.Title)
+		fmt.Printf("Item[%d] Link: %s\n", i, item.Link)
+		fmt.Printf("Item[%d] Description: %s\n", i, item.Description)
+		fmt.Printf("Item[%d] PubDate: %s\n", i, item.PubDate)
+	}
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.arg) < 2 {
+		return errors.New("enter feed name and URL")
+	}
+	currentUser, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
+	if err != nil {
+		return fmt.Errorf("failed to get current user: %w", err)
+	}
+	feed, err := s.db.CreateFeed(
+		context.Background(),
+		database.CreateFeedParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Name:      cmd.arg[0],
+			Url:       cmd.arg[1],
+			UserID:    currentUser.ID,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Feed added successfully: %s (ID: %s)\n", feed.Name, feed.ID)
+	return nil
+}
+
+func handlerFeeds(s *state, _ command) error {
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+	for _, feed := range feeds {
+		user, err := s.db.GetUserByID(context.Background(), feed.UserID)
+		if err != nil {
+			return fmt.Errorf("failed to get user for feed %s: %w", feed.Name, err)
+		}
+		fmt.Printf("Name: %s, URL: %s, Username: %s\n", feed.Name, feed.Url, user.Name)
+	}
+	return nil
+}
+
 type commands struct {
 	cmds map[string]func(*state, command) error
 }
