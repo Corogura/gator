@@ -22,6 +22,27 @@ type command struct {
 	arg  []string
 }
 
+func handlerSetup(s *state, _ command) error {
+	err := s.db.SetupUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to setup users: %w", err)
+	}
+	err = s.db.SetupFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to setup feeds: %w", err)
+	}
+	err = s.db.SetupFeedFollows(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to setup feed follows: %w", err)
+	}
+	err = s.db.SetupPosts(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to setup posts: %w", err)
+	}
+	fmt.Println("Database setup completed successfully")
+	return nil
+}
+
 func handlerLogin(s *state, cmd command) error {
 	if len(cmd.arg) == 0 {
 		return errors.New("enter username")
