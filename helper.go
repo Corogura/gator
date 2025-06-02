@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/Corogura/gator/internal/database"
 )
@@ -39,4 +40,23 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 		}
 		return handler(s, cmd, user)
 	}
+}
+
+func parsePubDate(pubDate string) (time.Time, error) {
+	// Parse the publication date from the RSS item
+	pubTime, err := time.Parse(time.RFC1123, pubDate)
+	if err == nil {
+		return pubTime, nil
+	}
+	// If RFC1123 fails, try RFC3339
+	pubTime, err = time.Parse(time.RFC3339, pubDate)
+	if err == nil {
+		return pubTime, nil
+	}
+	// If both formats fail, try RFC822
+	pubTime, err = time.Parse(time.RFC822, pubDate)
+	if err == nil {
+		return pubTime, nil
+	}
+	return time.Time{}, fmt.Errorf("failed to parse publication date: %w", err)
 }

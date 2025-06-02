@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Corogura/gator/internal/config"
@@ -83,24 +84,19 @@ func handlerUsers(s *state, _ command) error {
 	return nil
 }
 
-func handlerAgg(s *state, _ command) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	feed, err := fetchFeed(ctx, "https://www.wagslane.dev/index.xml")
+func handlerAgg(s *state, cmd command) error {
+	if len(cmd.arg) < 1 {
+		return errors.New("enter time period (e.g., 1h, 1d, 1w)")
+	}
+	fmt.Printf("Collecting feeds every %s\n", cmd.arg[0])
+	timePeriod, err := time.ParseDuration(cmd.arg[0])
 	if err != nil {
-		return fmt.Errorf("failed to fetch feed: %w", err)
+		return fmt.Errorf("invalid time period: %w", err)
 	}
-	fmt.Printf("Title: %s\n", feed.Channel.Title)
-	fmt.Printf("Link: %s\n", feed.Channel.Link)
-	fmt.Printf("Description: %s\n", feed.Channel.Description)
-	for i, item := range feed.Channel.Item {
-		fmt.Printf("Item[%d] Title: %s\n", i, item.Title)
-		fmt.Printf("Item[%d] Link: %s\n", i, item.Link)
-		fmt.Printf("Item[%d] Description: %s\n", i, item.Description)
-		fmt.Printf("Item[%d] PubDate: %s\n", i, item.PubDate)
+	ticker := time.NewTicker(timePeriod)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
 	}
-	return nil
 }
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {
@@ -208,6 +204,31 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 		return fmt.Errorf("failed to unfollow feed: %w", err)
 	}
 	fmt.Printf("Successfully unfollowed feed: %s\n", feed.Name)
+	return nil
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	limit := 2
+	if len(cmd.arg) > 0 {
+		var err error
+		limit, err = strconv.Atoi(cmd.arg[0])
+		if err != nil {
+			return fmt.Errorf("invalid limit: %w", err)
+		}
+	}
+	posts, err := s.db.GetPostsForUser(context.Background(), database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  int32(limit),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get posts for user: %w", err)
+	}
+	for _, post := range posts {
+		fmt.Println("--------------------------------------------------")
+		fmt.Printf("Title: %s\nURL: %s\nDescription: %s\nPublished At: %v\nFeed: %s\n",
+			post.Title, post.Url, post.Description, post.PublishedAt.Time, post.FeedName)
+		fmt.Println("--------------------------------------------------")
+	}
 	return nil
 }
 
